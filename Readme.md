@@ -11,7 +11,7 @@ If the date falls on a weekend or holiday, it uses the last available rate.
 ## Installation
 
 ```sh
-pip install ecb-currency-exchange-rates
+pip install ecb-currency-exchange-rate
 ```
 
 ## Usage

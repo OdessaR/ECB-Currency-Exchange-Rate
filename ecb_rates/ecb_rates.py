@@ -46,7 +46,7 @@ def update_historical_rates(xml_file):
         print("Exchange rate up to date!")
         return
 
-def get_exchange_rate(xml_file, date, from_currency, to_currency):
+def get_exchange_rate(date, from_currency, to_currency):
     """
     Fetches the exchange rate for a given date, from_currency, and to_currency from the ECB historical XML file.
     If the date falls on a weekend or holiday, it uses the last available rate.
