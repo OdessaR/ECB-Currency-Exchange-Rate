@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 import requests
 import logging
+import os
 
 # Set up logging configuration
 logging.basicConfig(
@@ -11,59 +12,49 @@ logging.basicConfig(
 )
 
 namespaces = {'xmlns': 'http://www.ecb.int/vocabulary/2002-08-01/eurofxref'}
-xml_file = 'eurofxref-hist.xml'
 ecb_hist_rate_url = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml'
+xml_file = f"eurofxref-hist-{datetime.today().strftime('%Y-%m-%d')}.xml"
 
+def get_existing_xml_file():
+    """Finds the latest existing eurofxref XML file in the current directory."""
+    for file in os.listdir():
+        if file.startswith("eurofxref-hist-") and file.endswith(".xml"):
+            return file
+    return None
 
 def fetch_rates():
     """
-    Downloads the latest historical exchange rate data from the ECB and saves it to a local file.
+    Downloads the latest historical exchange rate data from the ECB and saves it to a new dated XML file.
+    Removes the previous XML file if found.
     """
+    old_file = get_existing_xml_file()
+    if old_file:
+        os.remove(old_file)
+        logging.info(f"Removed old file: {old_file}")
+
     logging.info(f"Downloading {xml_file}...")
     try:
         response = requests.get(ecb_hist_rate_url, stream=True)
-        response.raise_for_status()  # Raise an exception for HTTP errors (4xx, 5xx)
+        response.raise_for_status()
 
         with open(xml_file, "wb") as file:
             for chunk in response.iter_content(1024):
                 file.write(chunk)
-
-        logging.info(f"Downloaded and replaced {xml_file} successfully.")
+        
+        logging.info(f"Downloaded and saved as {xml_file} successfully.")
     except requests.RequestException as e:
         logging.error(f"Failed to download {xml_file}. Error: {e}")
 
-
-def update_historical_rates(xml_file):
+def update_historical_rates():
     """
-    Updates the historical rates if today's exchange rate is not already present.
-    Fetches new data if necessary.
-
-    :param xml_file: Path to the historical ECB XML file.
+    Checks if the latest XML file for today exists; if not, downloads a new one.
     """
-    today_str = datetime.today().strftime("%Y-%m-%d")
+    existing_file = get_existing_xml_file()
+    if existing_file == xml_file:
+        return
     
-    try:
-        hist_tree = ET.parse(xml_file)
-        hist_root = hist_tree.getroot()
-        
-        available_dates = sorted(
-            [cube.attrib['time'] for cube in hist_root.findall(".//xmlns:Cube/xmlns:Cube[@time]", namespaces)],
-            reverse=True
-        )
-
-        if today_str not in available_dates:
-            logging.info("Today's exchange rate not found. Fetching new rate file.")
-            fetch_rates()
-        else:
-            logging.info("Exchange rates are up to date.")
-    except FileNotFoundError:
-        logging.warning(f"File {xml_file} not found. Attempting to fetch data.")
-        fetch_rates()
-    except ET.ParseError:
-        logging.error(f"Error parsing the XML file {xml_file}. Please check the file integrity.")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred while updating historical rates: {e}")
-
+    logging.info("Today's exchange rate file not found. Fetching new rate file.")
+    fetch_rates()
 
 def get_exchange_rate(date, from_currency, to_currency):
     """
@@ -75,7 +66,7 @@ def get_exchange_rate(date, from_currency, to_currency):
     :param to_currency: The target currency (e.g., 'EUR').
     :return: Exchange rate as a float or None if not found.
     """
-    update_historical_rates(xml_file)
+    update_historical_rates()
 
     try:
         tree = ET.parse(xml_file)
